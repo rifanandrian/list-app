@@ -1,8 +1,138 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import styles from '../styles/Home.module.css'
+import Head from 'next/head';
+import Image from 'next/image';
+import { useState, useEffect } from 'react';
+import styles from '../styles/Home.module.css';
+
+import {
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
+  TableSortLabel,
+  Paper,
+  Button,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControl
+} from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
+import Moment from 'react-moment';
+import ManageSearchIcon from '@mui/icons-material/ManageSearch';
 
 export default function Home() {
+  const [state, setState] = useState({
+    users: [],
+    page: 0,
+    rowsPerPage: 5,
+    filter: '',
+    gender: 'all'
+  });
+  const { users, page, filter, rowsPerPage, gender } = state;
+  const [order, setOrder] = useState('asc');
+  const [orderBy, setOrderBy] = useState('username');
+
+  const headTable = [
+    {
+      id: 'username',
+      label: 'Username',
+    },
+    {
+      id: 'name',
+      label: 'Name',
+    },
+    {
+      id: 'email',
+      label: 'Email',
+    },
+    {
+      id: 'gender',
+      label: 'Gender',
+    },
+    {
+      id: 'register_date',
+      label: 'Register Date',
+    },
+  ];
+
+  const fetchData = async (page, size, gender, keywords, sortBy, sortOrder) => {
+    try {
+      await fetch(`https://randomuser.me/api/?page=${!!page ? page : 0}&size=${!!size ? size : 5}&pageSize=10&results=10${!!gender ? `&gender=${gender}` : ''}${!!keywords ? `&keywords=${keywords}` : ''}${!!sortBy ? `&sortBy=${sortBy}` : ''}${!!sortOrder ? `&sortOrder=${sortOrder}` : ''}`)
+        .then((response) => response.json())
+        .then((data) => {
+          const results = data.results.map(res => ({
+            username: res.login.username,
+            name: res.name.first + ' ' + res.name.last,
+            email: res.email,
+            gender: res.gender,
+            register_date: res.registered.date
+          }));
+          setState({ users: results, rowsPerPage: !!size ? size : 5, page: !!page ? page : 0, gender: gender })
+        });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchData(0, 5);
+  }, []);
+
+  const descendingComparator = (a, b, orderBy) => {
+    if (b[orderBy] < a[orderBy]) {
+      return -1;
+    }
+    if (b[orderBy] > a[orderBy]) {
+      return 1;
+    }
+    return 0;
+  }
+
+  const getComparator = (a, b) => {
+    return order === 'desc'
+      ? (a, b) => descendingComparator(a, b, orderBy)
+      : (a, b) => -descendingComparator(a, b, orderBy);
+  }
+
+  const handleChangePage = (event, newPage) => {
+    fetchData(newPage, rowsPerPage);
+    setState({...state, page: newPage})
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    fetchData(0, parseInt(event.target.value, 10));
+    // setState({...state, rowsPerPage: parseInt(event.target.value, 10)})
+  };
+
+  const handleRequestSort = (property) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+    fetchData(page, rowsPerPage, gender, filter, property, isAsc ? 'descend' : 'ascend')
+  };
+
+  const handleGenderChange = (event) => {
+    setState({...state, gender: event.target.value});
+    fetchData(page, rowsPerPage, event.target.value !== 'all' ? event.target.value : null);
+  };
+
+  const handleResetFiter = () => {
+    setState({...state, gender: 'all', filter: ''});
+    fetchData(page, rowsPerPage)
+  };
+
+  const handleInputFilter = (event) => {
+    setState({...state, gender: 'all', filter: event.target.value});
+  };
+
+  const searchInput = () => {
+    fetchData(page, rowsPerPage, gender !== 'all' ? gender : null, filter)
+  }
+
   return (
     <div className={styles.container}>
       <Head>
@@ -12,58 +142,85 @@ export default function Home() {
       </Head>
 
       <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
+        <Box sx={{ width: '100%' }}>
+          <Paper sx={{ width: '100%', mb: 2 }}>
+            <div className={styles.filter_holder}>
+              <input className={styles.input} type="text" value={filter} onKeyUp={handleInputFilter} />
+              <Button variant="contained" onClick={searchInput}>Search</Button>
 
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
+              <select
+                className={styles.select}
+                placeholder='Gender'
+                value={gender}
+                label="gender"
+                onChange={handleGenderChange}
+              >
+                <option value={'all'}>All</option>
+                <option value={'male'}>Male</option>
+                <option value={'female'}>Female</option>
+              </select>
+              <Button className={styles.ml} variant="outlined" onClick={handleResetFiter}>Reset Filter</Button>
 
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h2>Learn &rarr;</h2>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/canary/examples"
-            className={styles.card}
-          >
-            <h2>Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
-        </div>
+            </div>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    {headTable.map((headTable) => (
+                      <TableCell
+                        key={headTable.id}
+                        align={'left'}
+                        padding={'normal'}
+                        sortDirection={orderBy === headTable.id ? order : false}
+                      >
+                        <TableSortLabel
+                          active={orderBy === headTable.id}
+                          direction={orderBy === headTable.id ? order : 'asc'}
+                          onClick={() => handleRequestSort(headTable.id)}
+                        >
+                          {headTable.label}
+                          {orderBy === headTable.id ? (
+                            <Box component="span" sx={visuallyHidden}>
+                              {order === 'desc'
+                                ? 'sorted descending'
+                                : 'sorted ascending'}
+                            </Box>
+                          ) : null}
+                        </TableSortLabel>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {users
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((user, index) => {
+                      return (
+                        <TableRow hover key={index}>
+                          <TableCell>{user.username}</TableCell>
+                          <TableCell>{user.name}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>{user.gender}</TableCell>
+                          <TableCell><Moment format="DD/MM/YYYY">{user.register_date}</Moment></TableCell>
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              rowsPerPageOptions={[5, 10]}
+              component="div"
+              count={users.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </Paper>
+        </Box>
       </main>
 
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <span className={styles.logo}>
-            <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
-          </span>
-        </a>
-      </footer>
     </div>
-  )
+  );
 }
